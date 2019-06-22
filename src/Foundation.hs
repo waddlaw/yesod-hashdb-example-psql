@@ -20,6 +20,8 @@ import Control.Monad.Logger (LogSource)
 import Yesod.Auth.Dummy
 
 import Yesod.Auth.OpenId    (authOpenId, IdentifierType (Claimed))
+import Yesod.Auth.HashDB
+import Yesod.Auth.Message (AuthMessage (InvalidLogin))
 import Yesod.Default.Util   (addStaticContentExternal)
 import Yesod.Core.Types     (Logger)
 import qualified Yesod.Core.Unsafe as Unsafe
@@ -166,6 +168,11 @@ instance Yesod App where
     isAuthorized FaviconR _ = return Authorized
     isAuthorized RobotsR _ = return Authorized
     isAuthorized (StaticR _) _ = return Authorized
+    isAuthorized ProtectedR _ = do
+      mu <- maybeAuthId
+      return $ case mu of
+        Nothing -> AuthenticationRequired
+        Just _  -> Authorized
 
     -- the profile route requires that the user is authenticated, so we
     -- delegate to that function
@@ -250,17 +257,12 @@ instance YesodAuth App where
     authenticate creds = liftHandler $ runDB $ do
         x <- getBy $ UniqueUser $ credsIdent creds
         case x of
-            Just (Entity uid _) -> return $ Authenticated uid
-            Nothing -> Authenticated <$> insert User
-                { userIdent = credsIdent creds
-                , userPassword = Nothing
-                }
+          Just (Entity uid _) -> return $ Authenticated uid
+          Nothing             -> return $ UserError InvalidLogin
 
     -- You can add other plugins like Google Email, email or OAuth here
     authPlugins :: App -> [AuthPlugin App]
-    authPlugins app = [authOpenId Claimed []] ++ extraAuthPlugins
-        -- Enable authDummy login if enabled.
-        where extraAuthPlugins = [authDummy | appAuthDummyLogin $ appSettings app]
+    authPlugins _ = [authHashDB (Just . UniqueUser)]
 
 -- | Access function to determine if a user is logged in.
 isAuthenticated :: Handler AuthResult

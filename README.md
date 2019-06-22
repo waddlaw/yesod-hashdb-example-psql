@@ -3,7 +3,9 @@
 After installing Postgres, run:
 
 ```
-createuser postgres-hashdb-example --password postgres-hashdb-example --superuser
+postgres -D /usr/local/var/postgres
+
+createuser postgres-hashdb-example --password --superuser
 createdb postgres-hashdb-example
 createdb postgres-hashdb-example_test
 ```
